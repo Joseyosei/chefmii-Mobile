@@ -117,3 +117,11 @@
 - [x] Switch startOAuthLogin() to use WebBrowser.openAuthSessionAsync (avoids exp:// scheme)
 - [x] Update server /api/oauth/callback to pass sessionToken in redirect URL for native apps
 - [x] Extract sessionToken from WebBrowser result URL in login screen
+
+## Bottom Nav Fix
+- [x] Fix client tab bar to exactly 5 tabs: Home, Search, Bookings, Messages, Profile
+- [x] Remove all extra tabs beyond the 5 required (hide edit-profile, how-it-works, privacy-policy, terms-of-service, saved, notifications, review, booking, chef, messages/[bookingId])
+- [x] Active tab color: #F4A227 (saffron gold), inactive: #9CA3AF
+- [x] Tab bar background: #1C1C1E (dark)
+- [x] No label truncation — all labels fully visible (flexShrink: 0 on label)
+- [x] Safe area padding for iOS home indicator
