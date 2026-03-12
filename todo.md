@@ -71,3 +71,6 @@
 - [x] Replace app icon with official ChefMii logo (red-to-orange gradient wordmark)
 - [x] Update all icon asset locations (icon.png, splash-icon.png, favicon.png, android-icon-foreground.png)
 - [x] Upload to CDN and update app.config.ts logoUrl
+
+## Splash Screen
+- [x] Set splash screen background to white (#FFFFFF) for seamless logo transition
