@@ -128,6 +128,46 @@ export function registerOAuthRoutes(app: Express) {
     }
   });
 
+  // Apple Sign-In: exchange Apple identity token for a Manus session
+  app.post("/api/auth/apple", async (req: Request, res: Response) => {
+    const { identityToken, fullName, email } = req.body || {};
+    if (!identityToken) {
+      res.status(400).json({ error: "identityToken is required" });
+      return;
+    }
+    try {
+      // Use getUserInfoWithJwt to verify the Apple identity token via Manus
+      const userInfo = await sdk.getUserInfoWithJwt(identityToken);
+      if (!userInfo.openId) {
+        res.status(401).json({ error: "Invalid Apple identity token" });
+        return;
+      }
+      // Merge name from Apple (only provided on first sign-in)
+      const displayName = fullName
+        ? [fullName.givenName, fullName.familyName].filter(Boolean).join(" ") || userInfo.name
+        : userInfo.name;
+      const user = await syncUser({
+        openId: userInfo.openId,
+        name: displayName || null,
+        email: email || userInfo.email || null,
+        loginMethod: "apple",
+      });
+      const sessionToken = await sdk.createSessionToken(userInfo.openId, {
+        name: displayName || "",
+        expiresInMs: ONE_YEAR_MS,
+      });
+      const cookieOptions = getSessionCookieOptions(req);
+      res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+      res.json({
+        app_session_id: sessionToken,
+        user: buildUserResponse(user),
+      });
+    } catch (error) {
+      console.error("[OAuth] Apple sign-in failed", error);
+      res.status(500).json({ error: "Apple sign-in failed" });
+    }
+  });
+
   app.post("/api/auth/logout", (req: Request, res: Response) => {
     const cookieOptions = getSessionCookieOptions(req);
     res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });

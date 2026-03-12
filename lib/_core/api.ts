@@ -116,6 +116,25 @@ export async function exchangeOAuthCode(
   };
 }
 
+// Apple Sign-In: exchange Apple identity token for a session
+export async function signInWithApple(
+  identityToken: string,
+  fullName: { givenName?: string | null; familyName?: string | null } | null,
+  email: string | null,
+): Promise<{ sessionToken: string; user: any }> {
+  console.log("[API] signInWithApple called");
+  const result = await apiCall<{ app_session_id: string; user: any }>("/api/auth/apple", {
+    method: "POST",
+    body: JSON.stringify({ identityToken, fullName, email }),
+  });
+  const sessionToken = result.app_session_id;
+  console.log("[API] Apple sign-in result:", {
+    hasSessionToken: !!sessionToken,
+    hasUser: !!result.user,
+  });
+  return { sessionToken, user: result.user };
+}
+
 // Logout
 export async function logout(): Promise<void> {
   await apiCall<void>("/api/auth/logout", {

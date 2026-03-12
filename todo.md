@@ -100,3 +100,13 @@
 
 ## Bug Fixes
 - [x] Fix fontfaceobserver 6000ms timeout error (custom font loading crash on app start)
+
+## Auth Fixes
+- [x] Fix Google OAuth redirect URI error (exp:// scheme not allowed in Expo Go)
+- [x] Add Apple Sign-In button to login screen
+- [x] Add Apple Sign-In server endpoint (/api/auth/apple)
+- [x] Add usesAppleSignIn: true to iOS config in app.config.ts
+
+## Brand Color Update
+- [x] Update primary brand color from saffron gold (#F4A227) to coral red (#F04E37) to match ChefMii logo
+- [x] Update tint color to coral red for tab bar active state

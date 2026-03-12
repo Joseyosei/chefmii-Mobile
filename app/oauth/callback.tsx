@@ -6,9 +6,11 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useChefMii } from "@/lib/chefmii-context";
 
 export default function OAuthCallback() {
   const router = useRouter();
+  const { role, setIsOnboarded } = useChefMii();
   const params = useLocalSearchParams<{
     code?: string;
     state?: string;
@@ -60,6 +62,7 @@ export default function OAuthCallback() {
           }
 
           setStatus("success");
+          await setIsOnboarded(true);
           console.log("[OAuth] Web authentication successful, redirecting to home...");
           setTimeout(() => {
             router.replace("/(tabs)");
@@ -157,6 +160,7 @@ export default function OAuthCallback() {
           // User info is already in the OAuth callback response
           // No need to fetch from API
           setStatus("success");
+          await setIsOnboarded(true);
           console.log("[OAuth] Redirecting to home...");
           setTimeout(() => {
             router.replace("/(tabs)");
@@ -210,6 +214,7 @@ export default function OAuthCallback() {
           }
 
           setStatus("success");
+          await setIsOnboarded(true);
           console.log("[OAuth] Authentication successful, redirecting to home...");
 
           // Redirect to home after a short delay

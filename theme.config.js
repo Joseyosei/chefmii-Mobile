@@ -1,8 +1,8 @@
 /** @type {const} */
 const themeColors = {
   // ChefMii Brand Colors
-  primary: { light: '#F4A227', dark: '#F4A227' },       // Saffron Gold
-  secondary: { light: '#1C1C1E', dark: '#F4A227' },     // Charcoal / Gold in dark
+  primary: { light: '#F04E37', dark: '#F04E37' },       // ChefMii Coral Red (logo color)
+  secondary: { light: '#1C1C1E', dark: '#F04E37' },     // Charcoal / Coral in dark
   background: { light: '#FFFFFF', dark: '#0F0F10' },    // White / Near-black
   surface: { light: '#F9F9F9', dark: '#1C1C1E' },       // Light grey / Charcoal
   foreground: { light: '#1C1C1E', dark: '#F5F5F5' },    // Charcoal / Off-white
@@ -14,7 +14,6 @@ const themeColors = {
   gold: { light: '#F4A227', dark: '#F4A227' },          // Always gold (ratings, badges)
   elite: { light: '#7C3AED', dark: '#A78BFA' },         // Elite badge purple
   card: { light: '#FFFFFF', dark: '#1E1E20' },          // Card backgrounds
-  tint: { light: '#F4A227', dark: '#F4A227' },          // Tab bar active tint
+  tint: { light: '#F04E37', dark: '#F04E37' },          // Tab bar active tint (coral red)
 };
-
 module.exports = { themeColors };

@@ -1,6 +1,6 @@
 import { startOAuthLogin } from "@/constants/oauth";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -16,6 +16,14 @@ import Animated, { FadeInDown } from "react-native-reanimated";
 import { ScreenContainer } from "@/components/screen-container";
 import { useChefMii } from "@/lib/chefmii-context";
 import { useColors } from "@/hooks/use-colors";
+import * as Auth from "@/lib/_core/auth";
+import * as Api from "@/lib/_core/api";
+
+// Conditionally import Apple authentication (iOS only)
+let AppleAuthentication: typeof import("expo-apple-authentication") | null = null;
+if (Platform.OS === "ios") {
+  AppleAuthentication = require("expo-apple-authentication");
+}
 
 export default function LoginScreen() {
   const { role, setRole, setIsOnboarded } = useChefMii();
@@ -25,6 +33,89 @@ export default function LoginScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
   const [name, setName] = useState("");
+  const [appleAvailable, setAppleAvailable] = useState(false);
+
+  useEffect(() => {
+    if (Platform.OS === "ios" && AppleAuthentication) {
+      AppleAuthentication.isAvailableAsync().then(setAppleAvailable).catch(() => setAppleAvailable(false));
+    }
+  }, []);
+
+  const navigateAfterAuth = async () => {
+    await setIsOnboarded(true);
+    if (role === "chef") {
+      router.replace("/(chef)/dashboard" as never);
+    } else {
+      router.replace("/(client)/home" as never);
+    }
+  };
+
+  const handleOAuth = async () => {
+    setIsLoading(true);
+    try {
+      // startOAuthLogin opens the Manus OAuth portal in the system browser.
+      // The deep link callback (manus20260312121113://oauth/callback) will be
+      // handled by app/oauth/callback.tsx which stores the session token.
+      await startOAuthLogin();
+      // Don't navigate here — the OAuth callback screen handles the redirect
+      // after the deep link returns. Just stop the loading spinner.
+    } catch (err) {
+      Alert.alert("Sign In Failed", "Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAppleSignIn = async () => {
+    if (!AppleAuthentication) return;
+    setIsLoading(true);
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+
+      if (!credential.identityToken) {
+        Alert.alert("Sign In Failed", "Apple did not return an identity token.");
+        return;
+      }
+
+      const result = await Api.signInWithApple(
+        credential.identityToken,
+        credential.fullName,
+        credential.email,
+      );
+
+      if (result.sessionToken) {
+        await Auth.setSessionToken(result.sessionToken);
+        if (result.user) {
+          const userInfo: Auth.User = {
+            id: result.user.id,
+            openId: result.user.openId,
+            name: result.user.name,
+            email: result.user.email,
+            loginMethod: result.user.loginMethod,
+            lastSignedIn: new Date(result.user.lastSignedIn || Date.now()),
+          };
+          await Auth.setUserInfo(userInfo);
+        }
+        await navigateAfterAuth();
+      } else {
+        Alert.alert("Sign In Failed", "Could not complete Apple Sign-In. Please try again.");
+      }
+    } catch (err: any) {
+      if (err?.code === "ERR_REQUEST_CANCELED") {
+        // User cancelled — no error shown
+      } else {
+        console.error("[AppleAuth] Error:", err);
+        Alert.alert("Sign In Failed", "Apple Sign-In failed. Please try again.");
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleAuth = async () => {
     if (!email.trim()) {
@@ -38,36 +129,11 @@ export default function LoginScreen() {
 
     setIsLoading(true);
     try {
-      // Use Manus OAuth login
+      // Trigger Manus OAuth (opens system browser)
       await startOAuthLogin();
-      await setIsOnboarded(true);
-
-      // Route based on role
-      if (role === "chef") {
-        router.replace("/(chef)/dashboard" as never);
-      } else {
-        router.replace("/(client)/home" as never);
-      }
+      // Navigation is handled by the OAuth callback deep link
     } catch (err) {
       Alert.alert("Login Failed", "Please try again or use the Google sign-in option.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleOAuth = async () => {
-    setIsLoading(true);
-    try {
-      await startOAuthLogin();
-      await setIsOnboarded(true);
-
-      if (role === "chef") {
-        router.replace("/(chef)/dashboard" as never);
-      } else {
-        router.replace("/(client)/home" as never);
-      }
-    } catch (err) {
-      Alert.alert("Sign In Failed", "Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -123,10 +189,35 @@ export default function LoginScreen() {
                 </View>
               </Pressable>
 
+              {/* Apple Sign-In (iOS only, when available) */}
+              {appleAvailable && AppleAuthentication && (
+                <Pressable
+                  onPress={handleAppleSignIn}
+                  disabled={isLoading}
+                  style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
+                >
+                  <AppleAuthentication.AppleAuthenticationButton
+                    buttonType={
+                      isSignUp
+                        ? AppleAuthentication.AppleAuthenticationButtonType.SIGN_UP
+                        : AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN
+                    }
+                    buttonStyle={
+                      colors.background === "#FFFFFF" || colors.background === "#ffffff"
+                        ? AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+                        : AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+                    }
+                    cornerRadius={16}
+                    style={{ width: "100%", height: 56 }}
+                    onPress={handleAppleSignIn}
+                  />
+                </Pressable>
+              )}
+
               {/* Divider */}
               <View className="flex-row items-center gap-3">
                 <View className="flex-1 h-px bg-border" />
-                <Text className="text-muted text-sm">or</Text>
+                <Text className="text-muted text-sm">or continue with email</Text>
                 <View className="flex-1 h-px bg-border" />
               </View>
 
