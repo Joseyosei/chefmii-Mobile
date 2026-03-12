@@ -102,14 +102,13 @@ export const getLoginUrl = () => {
  * opens an in-app browser (SFSafariViewController / Chrome Custom Tab). This
  * avoids the exp:// scheme issue in Expo Go. The browser will follow the redirect
  * from the server back to the app's frontend URL, and the result URL will contain
- * the session token set via cookie.
+ * the session token and user as query params.
  *
  * On web, this simply redirects to the login URL.
  *
- * @returns Always null — the callback is handled by the server redirect to the
- *          frontend URL, which triggers a page reload with the session cookie set.
+ * @returns { sessionToken, user } on success, null on cancel/web.
  */
-export async function startOAuthLogin(): Promise<string | null> {
+export async function startOAuthLogin(): Promise<{ sessionToken: string; user: any } | null> {
   const loginUrl = getLoginUrl();
 
   if (ReactNative.Platform.OS === "web") {
@@ -142,9 +141,20 @@ export async function startOAuthLogin(): Promise<string | null> {
       try {
         const url = new URL(result.url);
         const sessionToken = url.searchParams.get("sessionToken");
+        const userBase64 = url.searchParams.get("user");
         if (sessionToken) {
           console.log("[OAuth] Session token extracted from redirect URL");
-          return sessionToken;
+          let user: any = null;
+          if (userBase64) {
+            try {
+              const decoded = atob(userBase64);
+              user = JSON.parse(decoded);
+              console.log("[OAuth] User extracted from redirect URL");
+            } catch {
+              console.warn("[OAuth] Failed to decode user from redirect URL");
+            }
+          }
+          return { sessionToken, user };
         }
       } catch (parseError) {
         console.error("[OAuth] Failed to parse redirect URL:", parseError);

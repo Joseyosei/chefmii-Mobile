@@ -18,11 +18,22 @@ import { useChefMii } from "@/lib/chefmii-context";
 import { useColors } from "@/hooks/use-colors";
 import * as Auth from "@/lib/_core/auth";
 import * as Api from "@/lib/_core/api";
+import Constants from "expo-constants";
 
-// Conditionally import Apple authentication (iOS only)
+// Detect Expo Go: Apple Sign-In requires a real signed build with the correct bundle ID.
+// In Expo Go, the app runs under Expo's bundle ID so Apple rejects the identity token.
+const isExpoGo =
+  Constants.executionEnvironment === "storeClient" ||
+  (Constants as any).appOwnership === "expo";
+
+// Conditionally import Apple authentication (iOS only, not in Expo Go)
 let AppleAuthentication: typeof import("expo-apple-authentication") | null = null;
-if (Platform.OS === "ios") {
-  AppleAuthentication = require("expo-apple-authentication");
+if (Platform.OS === "ios" && !isExpoGo) {
+  try {
+    AppleAuthentication = require("expo-apple-authentication");
+  } catch {
+    AppleAuthentication = null;
+  }
 }
 
 export default function LoginScreen() {
@@ -36,7 +47,7 @@ export default function LoginScreen() {
   const [appleAvailable, setAppleAvailable] = useState(false);
 
   useEffect(() => {
-    if (Platform.OS === "ios" && AppleAuthentication) {
+    if (Platform.OS === "ios" && !isExpoGo && AppleAuthentication) {
       AppleAuthentication.isAvailableAsync()
         .then(setAppleAvailable)
         .catch(() => setAppleAvailable(false));
@@ -55,52 +66,52 @@ export default function LoginScreen() {
   const handleOAuth = async () => {
     setIsLoading(true);
     try {
-      // startOAuthLogin now uses WebBrowser.openAuthSessionAsync on native.
-      // It opens an in-app browser (SFSafariViewController / Chrome Custom Tab)
-      // with the Manus OAuth portal. The server callback at /api/oauth/callback
-      // exchanges the code, sets a cookie, and redirects back to the frontend URL
-      // with sessionToken and user as query params.
-      // startOAuthLogin returns the sessionToken if it was in the redirect URL.
-      const sessionToken = await startOAuthLogin();
+      // startOAuthLogin uses WebBrowser.openAuthSessionAsync on native.
+      // Opens SFSafariViewController / Chrome Custom Tab with the Manus OAuth portal.
+      // Server callback at /api/oauth/callback exchanges the code, sets a cookie,
+      // and redirects back to the frontend URL with sessionToken as a query param.
+      const oauthResult = await startOAuthLogin();
 
-      if (sessionToken) {
-        // Native path: session token returned directly from the redirect URL
+      if (oauthResult) {
+        const { sessionToken, user: oauthUser } = oauthResult;
+        // Store the session token in SecureStore — this is all we need for native auth.
+        // All subsequent API calls will include this as a Bearer token in the Authorization header.
         await Auth.setSessionToken(sessionToken);
-        // Fetch user info from the server now that we have the token
-        const user = await Api.getMe();
-        if (user) {
+        // Also store user info so useAuth hook can find it immediately without an API call.
+        if (oauthUser) {
           const userInfo: Auth.User = {
-            id: user.id,
-            openId: user.openId,
-            name: user.name,
-            email: user.email,
-            loginMethod: user.loginMethod,
-            lastSignedIn: new Date(user.lastSignedIn || Date.now()),
+            id: oauthUser.id ?? 0,
+            openId: oauthUser.openId ?? "",
+            name: oauthUser.name ?? null,
+            email: oauthUser.email ?? null,
+            loginMethod: oauthUser.loginMethod ?? "google",
+            lastSignedIn: new Date(oauthUser.lastSignedIn || Date.now()),
           };
           await Auth.setUserInfo(userInfo);
         }
         await navigateAfterAuth();
       } else {
-        // Web path: session is set via cookie, check /api/auth/me to confirm
-        const user = await Api.getMe();
-        if (user) {
-          await navigateAfterAuth();
+        // Web path: session is set via cookie. On native, null means user cancelled.
+        if (Platform.OS === "web") {
+          const user = await Api.getMe();
+          if (user) {
+            await navigateAfterAuth();
+          }
         } else {
-          // On native, if no sessionToken was returned, the browser was likely
-          // closed before completing auth — don't show an error
+          // User likely cancelled the browser — no error shown
           console.log("[OAuth] No session token returned — user may have cancelled");
         }
       }
     } catch (err) {
       console.error("[OAuth] handleOAuth error:", err);
-      Alert.alert("Sign In Failed", "Please try again.");
+      Alert.alert("Sign In Failed", "Could not complete sign-in. Please try again.");
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleAppleSignIn = async () => {
-    if (!AppleAuthentication) return;
+    if (!AppleAuthentication || isExpoGo) return;
     setIsLoading(true);
     try {
       const credential = await AppleAuthentication.signInAsync({
@@ -190,24 +201,47 @@ export default function LoginScreen() {
               <Pressable
                 onPress={handleOAuth}
                 disabled={isLoading}
-                style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
+                style={({ pressed }) => ({
+                  opacity: pressed ? 0.85 : 1,
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                  borderWidth: 1,
+                  borderRadius: 16,
+                  paddingVertical: 16,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 10,
+                })}
               >
-                <View className="bg-card border border-border rounded-2xl py-4 flex-row items-center justify-center gap-3">
-                  {isLoading ? (
-                    <ActivityIndicator size="small" color={colors.primary} />
-                  ) : (
-                    <>
-                      <Text className="text-2xl">🔑</Text>
-                      <Text className="text-foreground font-semibold text-base">
-                        Continue with Google
-                      </Text>
-                    </>
-                  )}
-                </View>
+                {isLoading ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <>
+                    {/* Google G logo — rendered as coloured text since no SVG needed */}
+                    <View
+                      style={{
+                        width: 24,
+                        height: 24,
+                        borderRadius: 12,
+                        backgroundColor: "#fff",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        borderWidth: 1,
+                        borderColor: "#E5E7EB",
+                      }}
+                    >
+                      <Text style={{ fontSize: 14, fontWeight: "700", color: "#4285F4" }}>G</Text>
+                    </View>
+                    <Text style={{ color: colors.foreground, fontWeight: "600", fontSize: 16 }}>
+                      Continue with Google
+                    </Text>
+                  </>
+                )}
               </Pressable>
 
-              {/* Apple Sign-In (iOS only, when available) */}
-              {appleAvailable && AppleAuthentication && (
+              {/* Apple Sign-In (iOS only, not in Expo Go) */}
+              {appleAvailable && AppleAuthentication && !isExpoGo && (
                 <AppleAuthentication.AppleAuthenticationButton
                   buttonType={
                     isSignUp
@@ -286,24 +320,26 @@ export default function LoginScreen() {
                 </Pressable>
               )}
 
-              {/* Submit button — triggers Google OAuth (email/password not supported) */}
+              {/* Submit button — triggers Google OAuth */}
               <Pressable
                 onPress={handleOAuth}
                 disabled={isLoading}
-                style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
+                style={({ pressed }) => ({
+                  opacity: pressed ? 0.85 : 1,
+                  backgroundColor: accentColor,
+                  borderRadius: 16,
+                  paddingVertical: 16,
+                  alignItems: "center",
+                  marginTop: 8,
+                })}
               >
-                <View
-                  className="rounded-2xl py-4 items-center mt-2"
-                  style={{ backgroundColor: accentColor }}
-                >
-                  {isLoading ? (
-                    <ActivityIndicator color="white" />
-                  ) : (
-                    <Text className="text-white font-bold text-base">
-                      {isSignUp ? "Create Account" : "Sign In"}
-                    </Text>
-                  )}
-                </View>
+                {isLoading ? (
+                  <ActivityIndicator color="white" />
+                ) : (
+                  <Text style={{ color: "white", fontWeight: "700", fontSize: 16 }}>
+                    {isSignUp ? "Create Account" : "Sign In"}
+                  </Text>
+                )}
               </Pressable>
 
               {/* Toggle sign up / sign in */}

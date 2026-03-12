@@ -125,3 +125,10 @@
 - [x] Tab bar background: #1C1C1E (dark)
 - [x] No label truncation — all labels fully visible (flexShrink: 0 on label)
 - [x] Safe area padding for iOS home indicator
+
+## Auth Bug Fixes (from Expo Go testing)
+- [x] Fix Apple Sign-In in Expo Go: detect Expo Go via Constants.executionEnvironment and hide Apple button (Apple requires real signed build with correct bundle ID)
+- [x] Fix session token not persisted after OAuth — now stores both sessionToken and user info from redirect URL params
+- [x] Fix Google OAuth button showing key emoji — replaced with proper Google G logo badge
+- [x] Fix startOAuthLogin return type to return { sessionToken, user } object
+- [x] Fix handleOAuth to store user info immediately after OAuth (no getMe call needed)
