@@ -1,11 +1,13 @@
 import "@/global.css";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
+import { useFonts } from "expo-font";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
-import { Platform } from "react-native";
+import { Platform, View } from "react-native";
 import "@/lib/_core/nativewind-pressable";
 import { ThemeProvider } from "@/lib/theme-provider";
 import {
@@ -28,6 +30,9 @@ export const unstable_settings = {
 };
 
 export default function RootLayout() {
+  // Preload MaterialIcons font to prevent fontfaceobserver 6000ms timeout on web
+  const [fontsLoaded, fontError] = useFonts(MaterialIcons.font);
+
   const initialInsets = initialWindowMetrics?.insets ?? DEFAULT_WEB_INSETS;
   const initialFrame = initialWindowMetrics?.frame ?? DEFAULT_WEB_FRAME;
 
@@ -73,6 +78,11 @@ export default function RootLayout() {
       },
     };
   }, [initialInsets, initialFrame]);
+
+  // Wait for fonts to load before rendering — prevents fontfaceobserver timeout crash
+  if (!fontsLoaded && !fontError) {
+    return <View style={{ flex: 1, backgroundColor: "#ffffff" }} />;
+  }
 
   const content = (
     <GestureHandlerRootView style={{ flex: 1 }}>

@@ -97,3 +97,6 @@
 - [x] Fix verification progress indicator to correctly reflect completed stages
 - [x] Fix My Packages page loading issue
 - [x] Allow chefs to add/edit/delete packages with labour cost and ingredients cost fields
+
+## Bug Fixes
+- [x] Fix fontfaceobserver 6000ms timeout error (custom font loading crash on app start)
