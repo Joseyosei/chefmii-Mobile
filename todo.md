@@ -74,3 +74,26 @@
 
 ## Splash Screen
 - [x] Set splash screen background to white (#FFFFFF) for seamless logo transition
+
+## UI Fixes & New Features (Batch 2)
+- [x] Fix client tab bar: Home, Search, Bookings, Messages, Profile (5 tabs only, no extra arrows)
+- [x] Fix chef tab bar: Dashboard, Bookings, Messages, Profile (correct icons and labels)
+- [x] Add left/right arrow navigation for date selection in booking flow
+- [x] Add more time slots to booking (06:00–23:00 in 30-min increments)
+- [x] Add Allergy field below Dietary Requirements in booking flow
+- [x] Show chef labour cost and ingredients cost breakdown below package price
+- [x] Add dark/light mode toggle button for client profile screen
+- [x] Add dark/light mode toggle button for chef profile screen
+- [x] Add back button on top-left of client profile screen
+- [x] Add back button on top-left of chef profile screen
+- [x] Write Privacy Policy page (full text)
+- [x] Write Terms of Service page (full text)
+- [x] Write How ChefMii Works page (full text)
+- [x] Build client edit profile screen with photo upload, name, address, phone number
+- [x] Build chef edit profile screen with photo upload, name, address, phone number
+- [x] Fix chef verification: document upload for identity (passport/driving licence)
+- [x] Fix chef verification: document upload for culinary credentials
+- [x] Fix chef verification: document upload for food safety certificate
+- [x] Fix verification progress indicator to correctly reflect completed stages
+- [x] Fix My Packages page loading issue
+- [x] Allow chefs to add/edit/delete packages with labour cost and ingredients cost fields

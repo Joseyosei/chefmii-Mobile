@@ -58,6 +58,15 @@ export default function ChefLayout() {
           tabBarIcon: ({ color }) => <IconSymbol name="person.fill" size={24} color={color} />,
         }}
       />
+      {/* Hide all sub-screens from tab bar */}
+      <Tabs.Screen name="availability" options={{ href: null }} />
+      <Tabs.Screen name="booking" options={{ href: null }} />
+      <Tabs.Screen name="earnings" options={{ href: null }} />
+      <Tabs.Screen name="edit-profile" options={{ href: null }} />
+      <Tabs.Screen name="gallery" options={{ href: null }} />
+      <Tabs.Screen name="messages/[bookingId]" options={{ href: null }} />
+      <Tabs.Screen name="packages" options={{ href: null }} />
+      <Tabs.Screen name="verification" options={{ href: null }} />
     </Tabs>
   );
 }

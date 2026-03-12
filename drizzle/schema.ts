@@ -59,6 +59,8 @@ export const packages = mysqlTable("packages", {
   minGuests: int("minGuests").default(1),
   maxGuests: int("maxGuests").default(10),
   sampleMenu: text("sampleMenu"),
+  labourCost: decimal("labourCost", { precision: 10, scale: 2 }),
+  ingredientsCost: decimal("ingredientsCost", { precision: 10, scale: 2 }),
   isActive: boolean("isActive").default(true),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });

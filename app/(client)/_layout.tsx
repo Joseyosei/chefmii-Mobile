@@ -33,7 +33,7 @@ export default function ClientLayout() {
       <Tabs.Screen
         name="home"
         options={{
-          title: "Discover",
+          title: "Home",
           tabBarIcon: ({ color }) => <IconSymbol name="house.fill" size={24} color={color} />,
         }}
       />
@@ -65,6 +65,13 @@ export default function ClientLayout() {
           tabBarIcon: ({ color }) => <IconSymbol name="person.fill" size={24} color={color} />,
         }}
       />
+      {/* Hide all sub-screens from tab bar */}
+      <Tabs.Screen name="booking" options={{ href: null }} />
+      <Tabs.Screen name="chef" options={{ href: null }} />
+      <Tabs.Screen name="messages/[bookingId]" options={{ href: null }} />
+      <Tabs.Screen name="notifications" options={{ href: null }} />
+      <Tabs.Screen name="saved" options={{ href: null }} />
+      <Tabs.Screen name="review" options={{ href: null }} />
     </Tabs>
   );
 }

@@ -1,10 +1,13 @@
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import * as ImagePicker from "expo-image-picker";
+import { Image } from "expo-image";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { trpc } from "@/lib/trpc";
 import { useColors } from "@/hooks/use-colors";
+import { useAuth } from "@/hooks/use-auth";
 
 const CUISINE_OPTIONS = [
   "Italian", "French", "Japanese", "Indian", "Mediterranean",
@@ -15,15 +18,18 @@ const CUISINE_OPTIONS = [
 
 export default function ChefEditProfileScreen() {
   const colors = useColors();
+  const { user } = useAuth();
   const { data: profile, isLoading } = trpc.chefs.getMyProfile.useQuery();
   const updateProfile = trpc.chefs.updateProfile.useMutation();
 
   const [bio, setBio] = useState("");
+  const [phone, setPhone] = useState("");
   const [location, setLocation] = useState("");
+  const [address, setAddress] = useState("");
   const [postcode, setPostcode] = useState("");
   const [experienceYears, setExperienceYears] = useState("");
   const [selectedCuisines, setSelectedCuisines] = useState<string[]>([]);
-  const [hourlyRate, setHourlyRate] = useState("");
+  const [avatarUri, setAvatarUri] = useState<string | null>(null);
 
   useEffect(() => {
     if (profile) {
@@ -35,6 +41,23 @@ export default function ChefEditProfileScreen() {
       // hourlyRate not in schema
     }
   }, [profile]);
+
+  const handlePickPhoto = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission Required", "Please allow access to your photo library to upload a profile picture.");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets[0]) {
+      setAvatarUri(result.assets[0].uri);
+    }
+  };
 
   const toggleCuisine = (cuisine: string) => {
     setSelectedCuisines((prev) =>
@@ -84,6 +107,49 @@ export default function ChefEditProfileScreen() {
           </View>
 
           <View className="px-5 py-4 gap-5">
+            {/* Avatar */}
+            <View className="items-center">
+              <Pressable onPress={handlePickPhoto} style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}>
+                <View className="relative">
+                  {avatarUri ? (
+                    <Image source={{ uri: avatarUri }} style={{ width: 96, height: 96, borderRadius: 48 }} contentFit="cover" />
+                  ) : (
+                    <View className="w-24 h-24 rounded-full items-center justify-center" style={{ backgroundColor: colors.primary + "20" }}>
+                      <Text className="text-primary text-4xl font-bold">{(user?.name ?? "C")[0].toUpperCase()}</Text>
+                    </View>
+                  )}
+                  <View className="absolute bottom-0 right-0 w-8 h-8 rounded-full items-center justify-center border-2 border-background" style={{ backgroundColor: colors.primary }}>
+                    <IconSymbol name="camera.fill" size={14} color="#fff" />
+                  </View>
+                </View>
+              </Pressable>
+              <Text className="text-muted text-xs mt-2">Tap to change profile photo</Text>
+            </View>
+
+            {/* Display Name (read-only) */}
+            <View>
+              <Text className="text-foreground font-semibold text-sm mb-2">Display Name</Text>
+              <View className="bg-surface border border-border rounded-2xl px-4 py-3 flex-row items-center gap-2">
+                <Text className="text-muted text-base flex-1">{user?.name ?? "—"}</Text>
+                <IconSymbol name="lock.fill" size={14} color={colors.muted} />
+              </View>
+              <Text className="text-muted text-xs mt-1">Name is linked to your Google account</Text>
+            </View>
+
+            {/* Phone */}
+            <View>
+              <Text className="text-foreground font-semibold text-sm mb-2">Phone Number</Text>
+              <TextInput
+                value={phone}
+                onChangeText={setPhone}
+                placeholder="+44 7700 900000"
+                placeholderTextColor={colors.muted}
+                className="bg-surface border border-border rounded-2xl px-4 py-3 text-foreground text-base"
+                keyboardType="phone-pad"
+                returnKeyType="next"
+              />
+            </View>
+
             {/* Bio */}
             <View>
               <Text className="text-foreground font-semibold text-sm mb-2">Bio</Text>
@@ -101,9 +167,22 @@ export default function ChefEditProfileScreen() {
               <Text className="text-muted text-xs mt-1 text-right">{bio.length}/500</Text>
             </View>
 
+            {/* Address */}
+            <View>
+              <Text className="text-foreground font-semibold text-sm mb-2">Home Address</Text>
+              <TextInput
+                value={address}
+                onChangeText={setAddress}
+                placeholder="Street address"
+                placeholderTextColor={colors.muted}
+                className="bg-surface border border-border rounded-2xl px-4 py-3 text-foreground text-base"
+                returnKeyType="next"
+              />
+            </View>
+
             {/* Location */}
             <View>
-              <Text className="text-foreground font-semibold text-sm mb-2">Location / City</Text>
+              <Text className="text-foreground font-semibold text-sm mb-2">City</Text>
               <TextInput
                 value={location}
                 onChangeText={setLocation}

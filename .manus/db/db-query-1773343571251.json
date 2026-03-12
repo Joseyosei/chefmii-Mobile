@@ -1,0 +1,9 @@
+{
+  "query": "ALTER TABLE packages ADD COLUMN labourCost DECIMAL(10,2) NULL, ADD COLUMN ingredientsCost DECIMAL(10,2) NULL;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 31ZVJyseHzc6Kgi.root --database Vig4kynRfuFURo5YJbs64X --execute ALTER TABLE packages ADD COLUMN labourCost DECIMAL(10,2) NULL, ADD COLUMN ingredientsCost DECIMAL(10,2) NULL;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 981
+}

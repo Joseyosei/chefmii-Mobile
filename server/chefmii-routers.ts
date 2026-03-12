@@ -212,6 +212,49 @@ export const chefsRouter = router({
         .limit(1);
       return profile;
     }),
+
+  getMyVerifications: publicProcedure.query(async ({ ctx }) => {
+    if (!ctx.user) return [];
+    const db = await getDb();
+    if (!db) return [];
+    const [chef] = await db
+      .select({ id: chefProfiles.id })
+      .from(chefProfiles)
+      .where(eq(chefProfiles.userId, ctx.user.id))
+      .limit(1);
+    if (!chef) return [];
+    return db
+      .select()
+      .from(chefVerification)
+      .where(eq(chefVerification.chefId, chef.id))
+      .orderBy(desc(chefVerification.submittedAt));
+  }),
+
+  submitVerification: publicProcedure
+    .input(
+      z.object({
+        stage: z.number().min(0).max(2),
+        documentUrls: z.array(z.string()),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.user) throw new Error("Unauthorized");
+      const db = await getDb();
+      if (!db) throw new Error("Database unavailable");
+      const [chef] = await db
+        .select({ id: chefProfiles.id })
+        .from(chefProfiles)
+        .where(eq(chefProfiles.userId, ctx.user.id))
+        .limit(1);
+      if (!chef) throw new Error("Chef profile not found. Please complete your profile first.");
+      await db.insert(chefVerification).values({
+        chefId: chef.id,
+        stage: input.stage,
+        documentUrls: input.documentUrls,
+        status: "pending",
+      });
+      return { success: true };
+    }),
 });
 
 // ─── Packages Router ──────────────────────────────────────────────────────────
@@ -251,6 +294,8 @@ export const packagesRouter = router({
         minGuests: z.number().min(1).default(1),
         maxGuests: z.number().min(1).default(10),
         sampleMenu: z.string().optional(),
+        labourCost: z.number().optional(),
+        ingredientsCost: z.number().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -263,12 +308,17 @@ export const packagesRouter = router({
         .from(chefProfiles)
         .where(eq(chefProfiles.userId, ctx.user.id))
         .limit(1);
-      if (!profile) throw new Error("Chef profile not found");
+      if (!profile) throw new Error("Chef profile not found. Please complete your profile first.");
 
-      const [pkg] = await db
-        .insert(packages)
-        .values({ ...input, chefId: profile.id, price: String(input.price) });
-      return pkg;
+      const { price, labourCost, ingredientsCost, ...rest } = input;
+      await db.insert(packages).values({
+        ...rest,
+        chefId: profile.id,
+        price: String(price),
+        ...(labourCost !== undefined ? { labourCost: String(labourCost) } : {}),
+        ...(ingredientsCost !== undefined ? { ingredientsCost: String(ingredientsCost) } : {}),
+      });
+      return { success: true };
     }),
 
   update: publicProcedure
@@ -281,6 +331,8 @@ export const packagesRouter = router({
         minGuests: z.number().optional(),
         maxGuests: z.number().optional(),
         sampleMenu: z.string().optional(),
+        labourCost: z.number().optional(),
+        ingredientsCost: z.number().optional(),
         isActive: z.boolean().optional(),
       })
     )
@@ -289,9 +341,11 @@ export const packagesRouter = router({
       const db = await getDb();
       if (!db) throw new Error("Database unavailable");
 
-      const { id, price, ...rest } = input;
+      const { id, price, labourCost, ingredientsCost, ...rest } = input;
       const updateData: Record<string, unknown> = { ...rest };
       if (price !== undefined) updateData.price = String(price);
+      if (labourCost !== undefined) updateData.labourCost = String(labourCost);
+      if (ingredientsCost !== undefined) updateData.ingredientsCost = String(ingredientsCost);
 
       await db.update(packages).set(updateData).where(eq(packages.id, id));
       return { success: true };

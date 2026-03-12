@@ -1,12 +1,12 @@
 import { router } from "expo-router";
-import { Alert, Pressable, ScrollView, Text, TextInput, View, ActivityIndicator } from "react-native";
+import { Alert, Pressable, ScrollView, Switch, Text, View } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useAuth } from "@/hooks/use-auth";
 import { useColors } from "@/hooks/use-colors";
 import { useChefMii } from "@/lib/chefmii-context";
+import { useThemeContext } from "@/lib/theme-provider";
 import { trpc } from "@/lib/trpc";
-import { useState } from "react";
 
 const BADGE_STYLES: Record<string, { bg: string; text: string; label: string }> = {
   elite: { bg: "#FFD700", text: "#7B5800", label: "⭐ Elite Chef" },
@@ -15,7 +15,21 @@ const BADGE_STYLES: Record<string, { bg: string; text: string; label: string }> 
   none: { bg: "#E5E7EB", text: "#687076", label: "Unverified" },
 };
 
-function ProfileMenuItem({ icon, label, onPress, danger, badge }: { icon: any; label: string; onPress: () => void; danger?: boolean; badge?: string }) {
+function ProfileMenuItem({
+  icon,
+  label,
+  onPress,
+  danger,
+  badge,
+  rightElement,
+}: {
+  icon: any;
+  label: string;
+  onPress: () => void;
+  danger?: boolean;
+  badge?: string;
+  rightElement?: React.ReactNode;
+}) {
   const colors = useColors();
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}>
@@ -31,7 +45,7 @@ function ProfileMenuItem({ icon, label, onPress, danger, badge }: { icon: any; l
             <Text className="text-white text-xs font-bold">{badge}</Text>
           </View>
         )}
-        <IconSymbol name="chevron.right" size={16} color={colors.muted} />
+        {rightElement ?? <IconSymbol name="chevron.right" size={16} color={colors.muted} />}
       </View>
     </Pressable>
   );
@@ -41,10 +55,11 @@ export default function ChefProfileScreen() {
   const { user, isAuthenticated, logout } = useAuth();
   const { clearRole } = useChefMii();
   const colors = useColors();
+  const { colorScheme, setColorScheme } = useThemeContext();
+  const isDark = colorScheme === "dark";
 
-  const { data: myProfile, isLoading } = trpc.chefs.getMyProfile.useQuery(undefined, { enabled: isAuthenticated });
+  const { data: myProfile } = trpc.chefs.getMyProfile.useQuery(undefined, { enabled: isAuthenticated });
   const { data: earnings } = trpc.bookings.getEarnings.useQuery();
-  const updateProfile = trpc.chefs.updateProfile.useMutation();
 
   const badgeTier = myProfile?.badgeTier ?? "none";
   const badgeStyle = BADGE_STYLES[badgeTier] ?? BADGE_STYLES.none;
@@ -82,8 +97,17 @@ export default function ChefProfileScreen() {
   return (
     <ScreenContainer>
       <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Header with back button */}
+        <View className="px-5 pt-4 pb-2 flex-row items-center justify-between">
+          <Pressable onPress={() => router.back()} style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}>
+            <IconSymbol name="arrow.left" size={22} color={colors.foreground} />
+          </Pressable>
+          <Text className="text-foreground text-lg font-bold">Chef Profile</Text>
+          <View style={{ width: 22 }} />
+        </View>
+
         {/* Profile Header */}
-        <View className="px-5 pt-6 pb-4 items-center">
+        <View className="px-5 pt-4 pb-4 items-center">
           <View className="w-24 h-24 bg-primary/20 rounded-full items-center justify-center mb-3">
             <Text className="text-primary text-4xl font-bold">
               {(user?.name ?? "C")[0].toUpperCase()}
@@ -126,7 +150,25 @@ export default function ChefProfileScreen() {
           <Text className="text-muted text-xs font-semibold uppercase tracking-wider mb-2 mt-5">Account</Text>
           <ProfileMenuItem icon="person.fill" label="Edit Profile" onPress={() => router.push("/(chef)/edit-profile" as never)} />
           <ProfileMenuItem icon="bell.fill" label="Notifications" onPress={() => {}} />
-          <ProfileMenuItem icon="shield.fill" label="Privacy Policy" onPress={() => {}} />
+
+          {/* Dark Mode Toggle */}
+          <View className="flex-row items-center gap-3 py-4 border-b border-border">
+            <View className="w-9 h-9 bg-surface rounded-xl items-center justify-center border border-border">
+              <IconSymbol name={isDark ? "moon.fill" : "sun.max.fill"} size={18} color={colors.foreground} />
+            </View>
+            <Text className="flex-1 text-foreground text-base">{isDark ? "Dark Mode" : "Light Mode"}</Text>
+            <Switch
+              value={isDark}
+              onValueChange={(val) => setColorScheme(val ? "dark" : "light")}
+              trackColor={{ false: colors.border, true: colors.primary }}
+              thumbColor="#fff"
+            />
+          </View>
+
+          <Text className="text-muted text-xs font-semibold uppercase tracking-wider mb-2 mt-5">Support</Text>
+          <ProfileMenuItem icon="info.circle.fill" label="How ChefMii Works" onPress={() => router.push("/(chef)/how-it-works" as never)} />
+          <ProfileMenuItem icon="shield.fill" label="Privacy Policy" onPress={() => router.push("/(chef)/privacy-policy" as never)} />
+          <ProfileMenuItem icon="doc.fill" label="Terms of Service" onPress={() => router.push("/(chef)/terms-of-service" as never)} />
 
           <View className="mt-5">
             <ProfileMenuItem icon="arrow.left" label="Sign Out" onPress={handleLogout} danger />
