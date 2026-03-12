@@ -110,3 +110,10 @@
 ## Brand Color Update
 - [x] Update primary brand color from saffron gold (#F4A227) to coral red (#F04E37) to match ChefMii logo
 - [x] Update tint color to coral red for tab bar active state
+
+## OAuth Redirect URI Fix
+- [x] Replace exp:// redirect URI with Manus HTTPS URL in constants/oauth.ts
+- [x] Ensure getRedirectUri() always returns the HTTPS Manus URL (not native scheme)
+- [x] Switch startOAuthLogin() to use WebBrowser.openAuthSessionAsync (avoids exp:// scheme)
+- [x] Update server /api/oauth/callback to pass sessionToken in redirect URL for native apps
+- [x] Extract sessionToken from WebBrowser result URL in login screen

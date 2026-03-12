@@ -89,7 +89,17 @@ export function registerOAuthRoutes(app: Express) {
         process.env.EXPO_WEB_PREVIEW_URL ||
         process.env.EXPO_PACKAGER_PROXY_URL ||
         "http://localhost:8081";
-      res.redirect(302, frontendUrl);
+
+      // Also pass sessionToken and user as query params so native apps (Expo Go)
+      // can read them from the WebBrowser.openAuthSessionAsync result URL.
+      // The user object is base64-encoded JSON to avoid URL encoding issues.
+      const savedUser = await getUserByOpenId(userInfo.openId!);
+      const userPayload = buildUserResponse(savedUser ?? userInfo as any);
+      const userBase64 = Buffer.from(JSON.stringify(userPayload)).toString("base64");
+      const redirectUrl = new URL(frontendUrl);
+      redirectUrl.searchParams.set("sessionToken", sessionToken);
+      redirectUrl.searchParams.set("user", userBase64);
+      res.redirect(302, redirectUrl.toString());
     } catch (error) {
       console.error("[OAuth] Callback failed", error);
       res.status(500).json({ error: "OAuth callback failed" });

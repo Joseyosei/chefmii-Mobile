@@ -26,7 +26,7 @@ if (Platform.OS === "ios") {
 }
 
 export default function LoginScreen() {
-  const { role, setRole, setIsOnboarded } = useChefMii();
+  const { role, setIsOnboarded } = useChefMii();
   const colors = useColors();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -37,7 +37,9 @@ export default function LoginScreen() {
 
   useEffect(() => {
     if (Platform.OS === "ios" && AppleAuthentication) {
-      AppleAuthentication.isAvailableAsync().then(setAppleAvailable).catch(() => setAppleAvailable(false));
+      AppleAuthentication.isAvailableAsync()
+        .then(setAppleAvailable)
+        .catch(() => setAppleAvailable(false));
     }
   }, []);
 
@@ -53,13 +55,44 @@ export default function LoginScreen() {
   const handleOAuth = async () => {
     setIsLoading(true);
     try {
-      // startOAuthLogin opens the Manus OAuth portal in the system browser.
-      // The deep link callback (manus20260312121113://oauth/callback) will be
-      // handled by app/oauth/callback.tsx which stores the session token.
-      await startOAuthLogin();
-      // Don't navigate here — the OAuth callback screen handles the redirect
-      // after the deep link returns. Just stop the loading spinner.
+      // startOAuthLogin now uses WebBrowser.openAuthSessionAsync on native.
+      // It opens an in-app browser (SFSafariViewController / Chrome Custom Tab)
+      // with the Manus OAuth portal. The server callback at /api/oauth/callback
+      // exchanges the code, sets a cookie, and redirects back to the frontend URL
+      // with sessionToken and user as query params.
+      // startOAuthLogin returns the sessionToken if it was in the redirect URL.
+      const sessionToken = await startOAuthLogin();
+
+      if (sessionToken) {
+        // Native path: session token returned directly from the redirect URL
+        await Auth.setSessionToken(sessionToken);
+        // Fetch user info from the server now that we have the token
+        const user = await Api.getMe();
+        if (user) {
+          const userInfo: Auth.User = {
+            id: user.id,
+            openId: user.openId,
+            name: user.name,
+            email: user.email,
+            loginMethod: user.loginMethod,
+            lastSignedIn: new Date(user.lastSignedIn || Date.now()),
+          };
+          await Auth.setUserInfo(userInfo);
+        }
+        await navigateAfterAuth();
+      } else {
+        // Web path: session is set via cookie, check /api/auth/me to confirm
+        const user = await Api.getMe();
+        if (user) {
+          await navigateAfterAuth();
+        } else {
+          // On native, if no sessionToken was returned, the browser was likely
+          // closed before completing auth — don't show an error
+          console.log("[OAuth] No session token returned — user may have cancelled");
+        }
+      }
     } catch (err) {
+      console.error("[OAuth] handleOAuth error:", err);
       Alert.alert("Sign In Failed", "Please try again.");
     } finally {
       setIsLoading(false);
@@ -117,28 +150,6 @@ export default function LoginScreen() {
     }
   };
 
-  const handleAuth = async () => {
-    if (!email.trim()) {
-      Alert.alert("Error", "Please enter your email address");
-      return;
-    }
-    if (isSignUp && !name.trim()) {
-      Alert.alert("Error", "Please enter your name");
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      // Trigger Manus OAuth (opens system browser)
-      await startOAuthLogin();
-      // Navigation is handled by the OAuth callback deep link
-    } catch (err) {
-      Alert.alert("Login Failed", "Please try again or use the Google sign-in option.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const roleLabel = role === "chef" ? "Chef" : "Client";
   const accentColor = role === "chef" ? colors.foreground : colors.primary;
 
@@ -182,36 +193,36 @@ export default function LoginScreen() {
                 style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
               >
                 <View className="bg-card border border-border rounded-2xl py-4 flex-row items-center justify-center gap-3">
-                  <Text className="text-2xl">🔑</Text>
-                  <Text className="text-foreground font-semibold text-base">
-                    Continue with Google
-                  </Text>
+                  {isLoading ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : (
+                    <>
+                      <Text className="text-2xl">🔑</Text>
+                      <Text className="text-foreground font-semibold text-base">
+                        Continue with Google
+                      </Text>
+                    </>
+                  )}
                 </View>
               </Pressable>
 
               {/* Apple Sign-In (iOS only, when available) */}
               {appleAvailable && AppleAuthentication && (
-                <Pressable
+                <AppleAuthentication.AppleAuthenticationButton
+                  buttonType={
+                    isSignUp
+                      ? AppleAuthentication.AppleAuthenticationButtonType.SIGN_UP
+                      : AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN
+                  }
+                  buttonStyle={
+                    colors.background === "#FFFFFF" || colors.background === "#ffffff"
+                      ? AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+                      : AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+                  }
+                  cornerRadius={16}
+                  style={{ width: "100%", height: 56 }}
                   onPress={handleAppleSignIn}
-                  disabled={isLoading}
-                  style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
-                >
-                  <AppleAuthentication.AppleAuthenticationButton
-                    buttonType={
-                      isSignUp
-                        ? AppleAuthentication.AppleAuthenticationButtonType.SIGN_UP
-                        : AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN
-                    }
-                    buttonStyle={
-                      colors.background === "#FFFFFF" || colors.background === "#ffffff"
-                        ? AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
-                        : AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
-                    }
-                    cornerRadius={16}
-                    style={{ width: "100%", height: 56 }}
-                    onPress={handleAppleSignIn}
-                  />
-                </Pressable>
+                />
               )}
 
               {/* Divider */}
@@ -275,9 +286,9 @@ export default function LoginScreen() {
                 </Pressable>
               )}
 
-              {/* Submit button */}
+              {/* Submit button — triggers Google OAuth (email/password not supported) */}
               <Pressable
-                onPress={handleAuth}
+                onPress={handleOAuth}
                 disabled={isLoading}
                 style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
               >

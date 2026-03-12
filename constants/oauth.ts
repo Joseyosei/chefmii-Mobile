@@ -1,4 +1,4 @@
-import * as Linking from "expo-linking";
+import * as WebBrowser from "expo-web-browser";
 import * as ReactNative from "react-native";
 
 // Extract scheme from bundle ID (last segment timestamp, prefixed with "manus")
@@ -65,17 +65,21 @@ const encodeState = (value: string) => {
 
 /**
  * Get the redirect URI for OAuth callback.
- * - Web: uses API server callback endpoint
- * - Native: uses deep link scheme
+ *
+ * IMPORTANT: On native platforms running in Expo Go, Linking.createURL() always
+ * returns the exp:// scheme regardless of the custom scheme — which the Manus
+ * OAuth portal rejects. To fix this, we always use the HTTPS API server callback
+ * URL on native. The server's /api/oauth/callback endpoint handles the code
+ * exchange and redirects back to the app's frontend URL.
+ *
+ * - Web: uses API server callback endpoint (same origin)
+ * - Native: uses HTTPS API server callback endpoint (avoids exp:// scheme)
  */
-export const getRedirectUri = () => {
-  if (ReactNative.Platform.OS === "web") {
-    return `${getApiBaseUrl()}/api/oauth/callback`;
-  } else {
-    return Linking.createURL("/oauth/callback", {
-      scheme: env.deepLinkScheme,
-    });
-  }
+export const getRedirectUri = (): string => {
+  const apiBase = getApiBaseUrl();
+  // Always use the HTTPS server callback — works on both web and native,
+  // and avoids the exp:// scheme that Manus OAuth rejects.
+  return `${apiBase}/api/oauth/callback`;
 };
 
 export const getLoginUrl = () => {
@@ -94,12 +98,16 @@ export const getLoginUrl = () => {
 /**
  * Start OAuth login flow.
  *
- * On native platforms (iOS/Android), open the system browser directly so
- * the OAuth callback returns via deep link to the app.
+ * On native platforms (iOS/Android), use WebBrowser.openAuthSessionAsync() which
+ * opens an in-app browser (SFSafariViewController / Chrome Custom Tab). This
+ * avoids the exp:// scheme issue in Expo Go. The browser will follow the redirect
+ * from the server back to the app's frontend URL, and the result URL will contain
+ * the session token set via cookie.
  *
  * On web, this simply redirects to the login URL.
  *
- * @returns Always null, the callback is handled via deep link.
+ * @returns Always null — the callback is handled by the server redirect to the
+ *          frontend URL, which triggers a page reload with the session cookie set.
  */
 export async function startOAuthLogin(): Promise<string | null> {
   const loginUrl = getLoginUrl();
@@ -112,20 +120,42 @@ export async function startOAuthLogin(): Promise<string | null> {
     return null;
   }
 
-  const supported = await Linking.canOpenURL(loginUrl);
-  if (!supported) {
-    console.warn("[OAuth] Cannot open login URL: URL scheme not supported");
-    // 可考虑抛出错误或返回错误状态，让调用方处理
-    return null;
-  }
-
+  // On native: use in-app browser. The server /api/oauth/callback will exchange
+  // the code, set a cookie, and redirect to the frontend URL (EXPO_PACKAGER_PROXY_URL,
+  // which is the 8081 Metro URL) with sessionToken and user as query params.
+  //
+  // We pass the Metro frontend URL as the redirectUrl so openAuthSessionAsync knows
+  // when to close the browser (when the URL starts with the frontend origin).
+  const apiBase = getApiBaseUrl();
+  // Derive the Metro (8081) URL from the API (3000) URL
+  const metroBase = apiBase.replace(/^(https?:\/\/)3000-/, "$18081-");
+  // Use the Metro URL as the redirect prefix — this is where the server redirects after auth
+  const redirectPrefix = metroBase || apiBase;
   try {
-    await Linking.openURL(loginUrl);
+    const result = await WebBrowser.openAuthSessionAsync(loginUrl, redirectPrefix);
+    console.log("[OAuth] WebBrowser result type:", result.type);
+
+    if (result.type === "success" && result.url) {
+      console.log("[OAuth] WebBrowser redirect URL received:", result.url.substring(0, 100));
+      // The server redirected to the frontend URL after setting the session cookie.
+      // Extract sessionToken from URL if present (server passes it as a query param).
+      try {
+        const url = new URL(result.url);
+        const sessionToken = url.searchParams.get("sessionToken");
+        if (sessionToken) {
+          console.log("[OAuth] Session token extracted from redirect URL");
+          return sessionToken;
+        }
+      } catch (parseError) {
+        console.error("[OAuth] Failed to parse redirect URL:", parseError);
+      }
+    } else if (result.type === "cancel" || result.type === "dismiss") {
+      console.log("[OAuth] User cancelled or dismissed the browser");
+    }
   } catch (error) {
-    console.error("[OAuth] Failed to open login URL:", error);
-    // 可考虑抛出错误让调用方处理
+    console.error("[OAuth] WebBrowser.openAuthSessionAsync failed:", error);
+    throw error;
   }
 
-  // The OAuth callback will reopen the app via deep link.
   return null;
 }
