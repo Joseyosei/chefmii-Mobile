@@ -29,7 +29,7 @@ const schemeFromBundleId = `manus${timestamp}`;
 const env = {
   appName: "ChefMii",
   appSlug: "chefmii",
-  logoUrl: "https://d2xsxph8kpxj0f.cloudfront.net/310519663428760263/Vig4kynRfuFURo5YJbs64X/icon_12a230c6.png",
+  logoUrl: "https://d2xsxph8kpxj0f.cloudfront.net/310519663428760263/Vig4kynRfuFURo5YJbs64X/icon_9cca1b4e.png",
   scheme: schemeFromBundleId,
   iosBundleId: bundleId,
   androidPackage: bundleId,
